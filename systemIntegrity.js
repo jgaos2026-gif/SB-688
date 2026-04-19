@@ -1,27 +1,41 @@
 const GOLDEN_INTEGRITY = 1.0;
 const FRACTIONAL_SURVIVAL_INTEGRITY = 0.01;
 
-let systemIntegrity = GOLDEN_INTEGRITY;
-let engineStatus = 'STABLE';
+const state = {
+  integrity: GOLDEN_INTEGRITY,
+  status: 'STABLE',
+};
+
+let stateQueue = Promise.resolve();
+
+function withStateLock(work) {
+  const run = stateQueue.then(work);
+  stateQueue = run.catch(() => undefined);
+  return run;
+}
 
 async function getSystemIntegrity() {
-  return systemIntegrity;
+  return withStateLock(() => state.integrity);
 }
 
 async function triggerInfrastructureKill() {
-  systemIntegrity = FRACTIONAL_SURVIVAL_INTEGRITY;
-  engineStatus = 'HEALING';
+  return withStateLock(() => {
+    state.integrity = FRACTIONAL_SURVIVAL_INTEGRITY;
+    state.status = 'HEALING';
+  });
 }
 
 async function checkEngineStatus() {
-  const statusSnapshot = engineStatus;
+  return withStateLock(() => {
+    const statusSnapshot = state.status;
 
-  if (engineStatus === 'HEALING') {
-    systemIntegrity = GOLDEN_INTEGRITY;
-    engineStatus = 'STABLE';
-  }
+    if (state.status === 'HEALING') {
+      state.integrity = GOLDEN_INTEGRITY;
+      state.status = 'STABLE';
+    }
 
-  return statusSnapshot;
+    return statusSnapshot;
+  });
 }
 
 module.exports = {
